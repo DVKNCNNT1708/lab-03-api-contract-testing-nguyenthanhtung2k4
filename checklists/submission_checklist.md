@@ -1,28 +1,23 @@
-# Submission Checklist — Lab 03
+﻿# Submission Checklist - Lab 03 (A4 AI Vision)
 
-Trước khi nộp, repo nhóm cần có:
+Trang thai theo nhung gi da co trong repo:
 
-```text
-contracts/<team>.openapi.yaml
-postman/collections/<team>.postman_collection.json
-postman/environments/<team>_mock.postman_environment.json
-postman/environments/<team>_local.postman_environment.json
-reports/newman-report.xml hoặc reports/newman-report.html
-checklists/reliability_checklist.md
-templates/test-case-matrix.csv
-templates/consumer-provider-handshake.md
-```
+- [x] `contracts/ai-vision.openapi.yaml`
+- [x] `postman/collections/FIT4110_lab03_ai_vision.postman_collection.json`
+- [x] `postman/environments/FIT4110_lab03_mock.postman_environment.json`
+- [x] `postman/environments/FIT4110_lab03_local.postman_environment.json`
+- [x] `reports/contract-lint-report.txt`
+- [x] `reports/newman-report-mock.xml`
+- [x] `reports/newman-report.html`
+- [x] `checklists/reliability_checklist.md`
+- [x] `templates/test-case-matrix.csv`
+- [x] `templates/consumer-provider-handshake.md`
 
-## Quy ước commit
+Ghi chu local:
 
-Gợi ý commit cuối:
+- [ ] `reports/newman-report-local.xml` pass day du.
+- Ly do: local service A4 chua chay tai `http://localhost:8004` (ECONNREFUSED), nen local test dang pending.
 
-```bash
-git add .
-git commit -m "lab03: add postman contract tests and newman report"
-git push
-```
+## Link nop LMS
 
-## Link nộp LMS
-
-Nộp link GitHub repo, không nộp file rời.
+- Nop link GitHub repo, khong nop file roi.

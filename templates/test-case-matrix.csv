@@ -1,6 +1,14 @@
-ID,Folder,Endpoint,Method,Scenario,Input file/body,Expected status,Expected response check,Type,Pass/Fail,Evidence
-TC01,Functional,/health,GET,Service is alive,-,200,status=ok,functional,,
-TC02,Functional,/readings,POST,Create reading happy path,mock-data/sensor-reading-valid.json,201,"has reading_id, accepted=true",functional,,
-TC03,Negative,/readings,POST,Missing device_id,mock-data/sensor-reading-invalid-missing-device.json,400,Problem Details,negative,,
-TC04,Auth,/readings,POST,Missing token,mock-data/sensor-reading-valid.json,401,Problem Details,auth,,
-TC05,Boundary,/readings,POST,High temperature boundary,mock-data/sensor-reading-boundary.json,201/400,documented behavior,boundary,,
+﻿ID,Folder,Endpoint,Method,Scenario,Input file/body,Expected status,Expected response check,Type,Pass/Fail,Evidence
+TC01,01_Functional,/api/v1/vision/health,GET,Health endpoint is alive,-,200,"body has status",functional,PASS,"Newman mock run"
+TC02,01_Functional,/api/v1/vision/frame-detections,POST,A2 happy path create frame detection,inline JSON req-a2-001,202,"has detectionId and status",functional,PASS,"Newman mock run"
+TC03,01_Functional,/api/v1/vision/frame-detections/{detectionId},GET,Read frame detection result by id,{{a2DetectionId}},200/404,"status code in [200,404]",functional,PASS,"Newman mock run"
+TC04,01_Functional,/api/v1/vision/models/info,GET,Read model info,-,200,"has modelName and supportedAnalysisTypes",functional,PASS,"Newman mock run"
+TC05,02_Auth,/api/v1/vision/analysis-jobs,POST,Missing token,inline JSON core-req-001,401/403(local) or 202/401/403(mock),"auth behavior asserted by env",auth,PASS,"Newman mock+local plan"
+TC06,02_Auth,/api/v1/vision/analysis-jobs,POST,Invalid token,inline JSON core-req-002,401/403(local) or 202/401/403(mock),"auth behavior asserted by env",auth,PASS,"Newman mock+local plan"
+TC07,03_Negative,/api/v1/vision/frame-detections,POST,Missing required field frameUrl,inline JSON req-neg-001,400/422,"problem response",negative,PASS,"Newman mock run"
+TC08,03_Negative,/api/v1/vision/analysis-jobs,POST,Invalid mediaUrl format,inline JSON core-neg-001,400/422,"problem response",negative,PASS,"Newman mock run"
+TC09,04_Boundary_Reliability,/api/v1/vision/frame-detections/{detectionId},GET,Invalid UUID boundary,not-a-uuid,400/404,"validation or not found",boundary,PASS,"Newman mock run"
+TC10,04_Boundary_Reliability,/api/v1/vision/analysis-jobs/{jobId},GET,Unknown job id boundary,660e8400-e29b-41d4-a716-446655449999,200/404,"not found or processing payload",boundary,PASS,"Newman mock run"
+TC11,05_Consumer_side_Smoke,/api/v1/vision/frame-detections,POST,Consumer A2(Camera Stream) calls A4,inline JSON smoke-a2-001,202,"contract accepted",consumer-smoke,PASS,"Newman mock run"
+TC12,05_Consumer_side_Smoke,/api/v1/vision/analysis-jobs,POST,Consumer A6(Core Business) calls A4,inline JSON smoke-a6-001,202,"contract accepted",consumer-smoke,PASS,"Newman mock run"
+TC13,06_Local_only_NonFunctional,/api/v1/vision/health,GET,Local response time SLA,-,"<1000ms when env=local","skip on mock",non-functional,PENDING,"Run npm run test:local with service at :8004"

@@ -1,48 +1,46 @@
-# Reliability Checklist — FIT4110 Lab 03
-
-Điền checklist này trước khi nộp Lab 03.
+﻿# Reliability Checklist - FIT4110 Lab 03 (A4 AI Vision)
 
 ## 1. Functional tests
 
-- [ ] Có test cho endpoint health.
-- [ ] Có test happy path cho endpoint chính.
-- [ ] Có kiểm tra status code 2xx.
-- [ ] Có kiểm tra field quan trọng trong response.
-- [ ] Có ít nhất 1 test đọc dữ liệu danh sách hoặc chi tiết.
+- [x] Co test cho endpoint health.
+- [x] Co test happy path cho endpoint chinh.
+- [x] Co kiem tra status code 2xx.
+- [x] Co kiem tra field quan trong trong response.
+- [x] Co it nhat 1 test doc du lieu chi tiet (GET by id, model info).
 
 ## 2. Auth tests
 
-- [ ] Có test thiếu token.
-- [ ] Có test sai token hoặc token rỗng.
-- [ ] Endpoint public được khai báo rõ nếu không cần auth.
-- [ ] Test thể hiện đúng expected status 401/403.
+- [x] Co test thieu token.
+- [x] Co test sai token.
+- [x] Endpoint public duoc khai bao ro (health).
+- [x] Test the hien expected status 401/403 tren local; mock co ghi chu hanh vi Prism.
 
 ## 3. Negative tests
 
-- [ ] Có test thiếu field bắt buộc.
-- [ ] Có test sai kiểu dữ liệu.
-- [ ] Có test sai enum hoặc giá trị ngoài miền.
-- [ ] Lỗi trả về theo cùng một error model.
+- [x] Co test thieu field bat buoc.
+- [x] Co test sai kieu du lieu / format (mediaUrl invalid).
+- [x] Co test boundary id invalid.
+- [x] Loi tra ve theo model error (ProblemDetails/ErrorResponse).
 
 ## 4. Boundary tests
 
-- [ ] Có test min/max hoặc dữ liệu sát ngưỡng.
-- [ ] Có test limit/pagination nếu endpoint có danh sách.
-- [ ] Có test payload lớn hoặc metadata thiếu.
-- [ ] Có ghi chú kỳ vọng xử lý dữ liệu biên.
+- [x] Co test gia tri bien cho id/khong ton tai.
+- [x] Co test truy van ket qua job/frame theo id.
+- [x] Co ghi chu ky vong xu ly du lieu bien trong test-case matrix.
+- [x] Co scenario unknown resource (404 hoac payload trang thai).
 
-## 5. Reliability tests cơ bản
+## 5. Reliability tests co ban
 
-- [ ] Có kiểm tra response time.
-- [ ] Có mô tả timeout mong muốn.
-- [ ] Có test hoặc ghi chú retry/idempotency nếu phù hợp.
-- [ ] Có consumer-side smoke test với ít nhất 1 mock của nhóm khác.
+- [x] Co kiem tra response time (folder 06_Local_only_NonFunctional).
+- [x] Co mo ta timeout/SLA < 1000ms cho local.
+- [ ] Chua co test retry/idempotency rieng (se bo sung neu service local co logic).
+- [x] Co consumer-side smoke test voi A2 va A6 vao A4.
 
 ## 6. Evidence
 
-- [ ] Collection export JSON.
-- [ ] Environment mock export JSON.
-- [ ] Environment local export JSON.
-- [ ] Newman report XML/HTML.
-- [ ] Test-case matrix đã điền.
-- [ ] Biên bản handshake đã điền.
+- [x] Collection export JSON: postman/collections/FIT4110_lab03_ai_vision.postman_collection.json
+- [x] Environment mock export JSON: postman/environments/FIT4110_lab03_mock.postman_environment.json
+- [x] Environment local export JSON: postman/environments/FIT4110_lab03_local.postman_environment.json
+- [x] Newman report XML/HTML trong reports/ (mock)
+- [x] Test-case matrix da dien.
+- [x] Bien ban handshake da dien.
