@@ -1,483 +1,48 @@
 openapi: 3.1.0
-
 info:
-  title: A4 AI Vision Service API
+  title: Smart Campus — AI Vision Service (Pair 01)
   version: 1.0.0
-  description: >
-    Dịch vụ A4 - AI Vision dùng trong hệ thống Smart Education / Smart Campus.
+  description: |
+    Hợp đồng API cho cặp đàm phán **Pair 01 — Camera Stream → AI Vision**.
 
-    Service này chịu trách nhiệm phân tích hình ảnh hoặc video từ camera,
-    phát hiện đối tượng và hành vi bất thường trong môi trường giáo dục thông minh.
+    - **Provider:** AI Vision Service
+    - **Consumer:** Camera Stream Service
+    - **Cơ chế:** REST synchronous
 
-    Các chức năng chính:
-    - Phát hiện người trong lớp học.
-    - Phát hiện học sinh ngủ gật.
-    - Phát hiện hành vi đánh nhau.
-    - Phát hiện té ngã.
-    - Phát hiện lớp học quá đông.
-    - Phát hiện sử dụng điện thoại.
-    - Phát hiện xâm nhập trái phép.
-    - Cung cấp thông tin model AI đang sử dụng.
+    Camera Stream gửi frame khi phát hiện motion. AI Vision xử lý đồng bộ và trả
+    kết quả nhận diện ngay lập tức (không cần polling).
 
-    Lưu ý:
-    - Service này không xử lý quẹt thẻ sinh viên.
-    - Quẹt thẻ sinh viên thuộc Access Gate Service.
-    - Access Gate sẽ kiểm tra quyền ra/vào với Core Business Service.
+    Các endpoint tuân chuẩn Problem Details RFC 7807 cho tất cả phản hồi lỗi 4xx/5xx.
+  contact:
+    name: Nguyễn Thành Tùng — Pair 01 AI Vision Provider
+    email: tungnt.it2k4@gmail.com
 
 servers:
-  - url: http://localhost:8004
-    description: Server local của AI Vision Service
-  - url: https://api.smart-campus.local/ai-vision
-    description: Server staging/demo của AI Vision Service
+  - url: http://localhost:4010
+    description: Prism mock server (Lab 02)
+  - url: https://ai-vision.campus.local
+    description: Class network placeholder
 
 tags:
-  - name: Camera AI Contract
-    description: Nhóm API để Camera Stream gửi frame/ảnh sang AI Vision phân tích.
-  - name: Core AI Contract
-    description: Nhóm API để Core Business yêu cầu AI Vision phân tích ảnh/video.
-  - name: Model Information
-    description: Nhóm API kiểm tra thông tin model AI và trạng thái service.
+  - name: health
+    description: Kiểm tra trạng thái sẵn sàng của AI Vision Service
+  - name: detection
+    description: Nhận diện đối tượng từ frame ảnh camera
+  - name: model
+    description: Thông tin model AI đang hoạt động
 
 security:
   - bearerAuth: []
 
 paths:
-  /api/v1/vision/frame-detections:
-    post:
-      operationId: createFrameDetection
-      summary: Camera gửi frame sang AI Vision để phát hiện đối tượng hoặc hành vi
-      description: >
-        API này được Camera Stream Service gọi khi camera phát hiện chuyển động
-        hoặc cần phân tích một frame cụ thể.
-
-        Camera gửi thông tin frame gồm cameraId, roomId, frameUrl, thời gian chụp
-        và loại phân tích mong muốn.
-
-        AI Vision sẽ nhận request và trả về detectionId.
-
-        Vì xử lý AI có thể mất thời gian, API trả về HTTP 202 Accepted.
-        Sau đó service khác có thể dùng detectionId để lấy kết quả ở endpoint:
-        GET /api/v1/vision/frame-detections/{detectionId}.
-      tags:
-        - Camera AI Contract
-      requestBody:
-        required: true
-        description: Dữ liệu frame do Camera Stream gửi sang AI Vision.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FrameDetectionRequest'
-            examples:
-              sleepingDetection:
-                summary: Ví dụ phát hiện học sinh ngủ gật
-                value:
-                  requestId: "req-001"
-                  cameraId: "CAM-A101-01"
-                  roomId: "A101"
-                  frameUrl: "https://storage.smart-campus.local/frames/cam-a101-01.jpg"
-                  capturedAt: "2026-05-20T08:00:00Z"
-                  analysisTypes:
-                    - "SLEEPING_DETECTION"
-                    - "PERSON_DETECTION"
-                  metadata:
-                    motionEventId: "motion-001"
-                    source: "camera-stream"
-
-              fightingDetection:
-                summary: Ví dụ phát hiện đánh nhau trong lớp
-                value:
-                  requestId: "req-002"
-                  cameraId: "CAM-A203-02"
-                  roomId: "A203"
-                  frameUrl: "https://storage.smart-campus.local/frames/cam-a203-02.jpg"
-                  capturedAt: "2026-05-20T09:15:00Z"
-                  analysisTypes:
-                    - "FIGHTING_DETECTION"
-                    - "PERSON_DETECTION"
-                  metadata:
-                    motionEventId: "motion-002"
-                    source: "camera-stream"
-
-      responses:
-        '202':
-          description: AI Vision đã nhận yêu cầu phân tích frame
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetectionAcceptedResponse'
-              examples:
-                accepted:
-                  summary: Yêu cầu đã được tiếp nhận
-                  value:
-                    detectionId: "550e8400-e29b-41d4-a716-446655440000"
-                    requestId: "req-001"
-                    status: "PROCESSING"
-                    message: "Yêu cầu phân tích frame đã được tiếp nhận"
-
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /api/v1/vision/frame-detections/{detectionId}:
+  /health:
     get:
-      operationId: getFrameDetectionResult
-      summary: Lấy kết quả phân tích frame từ AI Vision
-      description: >
-        API này dùng để lấy kết quả phân tích frame sau khi Camera Stream
-        hoặc Core Business đã gửi yêu cầu phân tích.
-
-        Input là detectionId được trả về từ API:
-        POST /api/v1/vision/frame-detections.
-
-        Trạng thái xử lý:
-        - PROCESSING: AI đang xử lý.
-        - COMPLETED: AI xử lý xong.
-        - FAILED: AI xử lý thất bại.
-      tags:
-        - Camera AI Contract
-      parameters:
-        - name: detectionId
-          in: path
-          required: true
-          description: Mã định danh của lần phân tích frame do AI Vision trả về.
-          schema:
-            type: string
-            format: uuid
-          example: "550e8400-e29b-41d4-a716-446655440000"
-
-      responses:
-        '200':
-          description: Kết quả phân tích frame
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FrameDetectionResponse'
-              examples:
-                sleepingCompleted:
-                  summary: Phân tích thành công và phát hiện học sinh ngủ gật
-                  value:
-                    detectionId: "550e8400-e29b-41d4-a716-446655440000"
-                    requestId: "req-001"
-                    cameraId: "CAM-A101-01"
-                    roomId: "A101"
-                    status: "COMPLETED"
-                    processedAt: "2026-05-20T08:00:03Z"
-                    detections:
-                      - objectId: "obj-001"
-                        classId: "student_sleeping"
-                        label: "student_sleeping"
-                        confidence: 0.91
-                        riskLevel: "MEDIUM"
-                        trackingId: "track-001"
-                        boundingBox:
-                          x: 120
-                          y: 80
-                          width: 220
-                          height: 300
-                        attributes:
-                          posture: "head_down"
-                          durationSeconds: 30
-                    summary:
-                      totalObjects: 1
-                      highestRiskLevel: "MEDIUM"
-                      eventType: "SLEEPING_DETECTION"
-
-                fightingCompleted:
-                  summary: Phân tích thành công và phát hiện đánh nhau
-                  value:
-                    detectionId: "550e8400-e29b-41d4-a716-446655440999"
-                    requestId: "req-002"
-                    cameraId: "CAM-A203-02"
-                    roomId: "A203"
-                    status: "COMPLETED"
-                    processedAt: "2026-05-20T09:15:03Z"
-                    detections:
-                      - objectId: "obj-002"
-                        classId: "fighting"
-                        label: "fighting"
-                        confidence: 0.88
-                        riskLevel: "HIGH"
-                        trackingId: "track-002"
-                        boundingBox:
-                          x: 80
-                          y: 100
-                          width: 350
-                          height: 420
-                        attributes:
-                          peopleCount: 2
-                          action: "physical_conflict"
-                    summary:
-                      totalObjects: 1
-                      highestRiskLevel: "HIGH"
-                      eventType: "FIGHTING_DETECTION"
-
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /api/v1/vision/analysis-jobs:
-    post:
-      operationId: createAnalysisJob
-      summary: Core Business tạo yêu cầu phân tích ảnh hoặc video cho AI Vision
-      description: >
-        API này được Core Business Service gọi khi muốn AI Vision phân tích
-        một ảnh, video hoặc frame theo nghiệp vụ trung tâm.
-
-        Ví dụ:
-        - Core nhận sự kiện bất thường và yêu cầu AI kiểm tra lại ảnh.
-        - Core muốn xác định có hành vi đánh nhau trong lớp hay không.
-        - Core muốn kiểm tra số lượng người trong phòng.
-        - Core muốn kiểm tra một ảnh/video do hệ thống lưu trữ.
-
-        API trả về jobId để Core dùng khi cần lấy kết quả xử lý.
-      tags:
-        - Core AI Contract
-      requestBody:
-        required: true
-        description: Dữ liệu yêu cầu phân tích ảnh/video từ Core Business.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AnalysisJobRequest'
-            examples:
-              fightingDetection:
-                summary: Ví dụ Core yêu cầu phát hiện đánh nhau
-                value:
-                  requestId: "core-req-001"
-                  sourceService: "core-business"
-                  sourceId: "incident-001"
-                  mediaType: "IMAGE"
-                  mediaUrl: "https://storage.smart-campus.local/incidents/frame-001.jpg"
-                  roomId: "A203"
-                  cameraId: "CAM-A203-02"
-                  requestedAt: "2026-05-20T09:15:00Z"
-                  analysisTypes:
-                    - "FIGHTING_DETECTION"
-                    - "PERSON_DETECTION"
-
-              crowdDetection:
-                summary: Ví dụ Core yêu cầu phát hiện phòng quá đông
-                value:
-                  requestId: "core-req-002"
-                  sourceService: "core-business"
-                  sourceId: "room-check-001"
-                  mediaType: "IMAGE"
-                  mediaUrl: "https://storage.smart-campus.local/rooms/a101-current.jpg"
-                  roomId: "A101"
-                  cameraId: "CAM-A101-01"
-                  requestedAt: "2026-05-20T10:00:00Z"
-                  analysisTypes:
-                    - "CROWD_DETECTION"
-                    - "PERSON_DETECTION"
-
-      responses:
-        '202':
-          description: AI Vision đã nhận yêu cầu phân tích ảnh/video
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AnalysisJobAcceptedResponse'
-              examples:
-                accepted:
-                  summary: Job phân tích đã được tạo
-                  value:
-                    jobId: "660e8400-e29b-41d4-a716-446655440111"
-                    requestId: "core-req-001"
-                    status: "PROCESSING"
-                    message: "Yêu cầu phân tích đã được tiếp nhận"
-
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /api/v1/vision/analysis-jobs/{jobId}:
-    get:
-      operationId: getAnalysisJobResult
-      summary: Core Business lấy kết quả phân tích ảnh/video
-      description: >
-        API này cho phép Core Business lấy kết quả của một analysis job.
-
-        Core truyền jobId để kiểm tra trạng thái và kết quả AI.
-
-        Trạng thái có thể là:
-        - PROCESSING: AI đang xử lý.
-        - COMPLETED: AI xử lý xong.
-        - FAILED: AI xử lý thất bại.
-      tags:
-        - Core AI Contract
-      parameters:
-        - name: jobId
-          in: path
-          required: true
-          description: Mã định danh của job phân tích do AI Vision trả về.
-          schema:
-            type: string
-            format: uuid
-          example: "660e8400-e29b-41d4-a716-446655440111"
-
-      responses:
-        '200':
-          description: Kết quả phân tích ảnh/video
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AnalysisJobResponse'
-              examples:
-                fightingCompleted:
-                  summary: Phát hiện hành vi đánh nhau
-                  value:
-                    jobId: "660e8400-e29b-41d4-a716-446655440111"
-                    requestId: "core-req-001"
-                    status: "COMPLETED"
-                    mediaType: "IMAGE"
-                    mediaUrl: "https://storage.smart-campus.local/incidents/frame-001.jpg"
-                    processedAt: "2026-05-20T09:15:03Z"
-                    detections:
-                      - objectId: "obj-002"
-                        classId: "fighting"
-                        label: "fighting"
-                        confidence: 0.88
-                        riskLevel: "HIGH"
-                        trackingId: "track-002"
-                        boundingBox:
-                          x: 80
-                          y: 100
-                          width: 350
-                          height: 420
-                        attributes:
-                          peopleCount: 2
-                          action: "physical_conflict"
-                    summary:
-                      totalObjects: 1
-                      highestRiskLevel: "HIGH"
-                      eventType: "FIGHTING_DETECTION"
-
-                crowdCompleted:
-                  summary: Phát hiện lớp học quá đông
-                  value:
-                    jobId: "660e8400-e29b-41d4-a716-446655440222"
-                    requestId: "core-req-002"
-                    status: "COMPLETED"
-                    mediaType: "IMAGE"
-                    mediaUrl: "https://storage.smart-campus.local/rooms/a101-current.jpg"
-                    processedAt: "2026-05-20T10:00:03Z"
-                    detections:
-                      - objectId: "obj-003"
-                        classId: "crowd"
-                        label: "crowd"
-                        confidence: 0.86
-                        riskLevel: "MEDIUM"
-                        boundingBox:
-                          x: 0
-                          y: 0
-                          width: 1280
-                          height: 720
-                        attributes:
-                          peopleCount: 52
-                          maxAllowedPeople: 45
-                    summary:
-                      totalObjects: 1
-                      highestRiskLevel: "MEDIUM"
-                      eventType: "CROWD_DETECTION"
-
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /api/v1/vision/models/info:
-    get:
-      operationId: getModelInfo
-      summary: Lấy thông tin model AI Vision
-      description: >
-        API này trả về thông tin model AI hiện tại, phiên bản model,
-        framework sử dụng, trạng thái model và các loại phân tích mà model hỗ trợ.
-
-        Service khác có thể gọi API này để kiểm tra AI Vision có sẵn sàng xử lý hay không.
-      tags:
-        - Model Information
-      responses:
-        '200':
-          description: Thông tin model AI
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelInfo'
-              examples:
-                modelInfo:
-                  summary: Thông tin model đang chạy
-                  value:
-                    modelName: "SmartCampus-YOLO-Behavior"
-                    version: "1.0.0"
-                    status: "READY"
-                    framework: "PyTorch"
-                    supportedAnalysisTypes:
-                      - "PERSON_DETECTION"
-                      - "ATTENDANCE_RECOGNITION"
-                      - "SLEEPING_DETECTION"
-                      - "FIGHTING_DETECTION"
-                      - "FALL_DETECTION"
-                      - "CROWD_DETECTION"
-                      - "PHONE_USAGE_DETECTION"
-                      - "INTRUSION_DETECTION"
-                    updatedAt: "2026-05-20T00:00:00Z"
-                    description: "Model AI dùng để giám sát lớp học thông minh."
-
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /api/v1/vision/health:
-    get:
-      operationId: getVisionHealth
-      summary: Kiểm tra trạng thái hoạt động của AI Vision Service
-      description: >
-        API health check dùng để kiểm tra service AI Vision và model AI
-        có đang hoạt động bình thường hay không.
-
-        Endpoint này không yêu cầu xác thực để dễ dùng cho monitoring.
-      tags:
-        - Model Information
+      operationId: getHealth
+      summary: Kiểm tra trạng thái AI Vision Service
+      description: |
+        Endpoint không yêu cầu xác thực. Camera Stream gọi trước khi gửi detect request
+        để đảm bảo AI Vision đang sẵn sàng.
+      tags: [health]
       security: []
       responses:
         '200':
@@ -485,17 +50,215 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: '#/components/schemas/HealthStatus'
               examples:
                 healthy:
-                  summary: Service hoạt động bình thường
+                  summary: Service sẵn sàng
                   value:
-                    status: "UP"
-                    modelStatus: "READY"
-                    timestamp: "2026-05-20T08:00:00Z"
+                    status: healthy
+                    service: ai-vision
+                    version: 1.0.0
+                    uptime: 86400
+                    timestamp: '2026-05-12T08:00:00Z'
 
+  /vision/detect:
+    post:
+      operationId: submitDetectRequest
+      summary: Gửi frame ảnh để nhận diện đối tượng
+      description: |
+        Camera Stream gửi frame ảnh (qua URL hoặc base64) khi phát hiện motion.
+        AI Vision xử lý đồng bộ và trả kết quả ngay trong response.
+
+        - Timeout tối đa phía server: **10 giây**
+        - Giới hạn kích thước ảnh: **5 MB**
+        - Hỗ trợ hai dạng input: `imageUrl` hoặc `imageBase64` — phân biệt qua `inputType`
+
+        Camera cần gửi `correlationId` (UUID v4) để trace log end-to-end.
+      tags: [detection]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectRequest'
+            examples:
+              byUrl:
+                summary: Gửi ảnh qua URL
+                value:
+                  cameraId: CAM-0001
+                  inputType: URL
+                  imageUrl: https://storage.campus.local/frames/cam0001-20260512-080000.jpg
+                  correlationId: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp: '2026-05-12T08:00:00Z'
+              byBase64:
+                summary: Gửi ảnh qua base64
+                value:
+                  cameraId: CAM-0002
+                  inputType: BASE64
+                  imageBase64: /9j/4AAQSkZJRgABAQAAAQABAAD...
+                  correlationId: 550e8400-e29b-41d4-a716-446655440001
+                  timestamp: '2026-05-12T08:00:01Z'
+      responses:
+        '200':
+          description: Nhận diện thành công, trả kết quả đồng bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detection'
+              examples:
+                highRisk:
+                  summary: Phát hiện người lạ — rủi ro cao
+                  value:
+                    detectionId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    cameraId: CAM-0001
+                    correlationId: 550e8400-e29b-41d4-a716-446655440000
+                    riskLevel: high
+                    modelVersion: v2.3.1
+                    processingTimeMs: 320
+                    timestamp: '2026-05-12T08:00:00Z'
+                    objects:
+                      - label: person
+                        confidence: 0.94
+                        trackingId: TRK-0001
+                        boundingBox:
+                          x: 120
+                          y: 80
+                          width: 200
+                          height: 400
+                      - label: backpack
+                        confidence: 0.78
+                        trackingId: null
+                        boundingBox:
+                          x: 150
+                          y: 300
+                          width: 100
+                          height: 150
+                lowRisk:
+                  summary: Không phát hiện bất thường
+                  value:
+                    detectionId: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                    cameraId: CAM-0002
+                    correlationId: 550e8400-e29b-41d4-a716-446655440001
+                    riskLevel: low
+                    modelVersion: v2.3.1
+                    processingTimeMs: 215
+                    timestamp: '2026-05-12T08:00:01Z'
+                    objects: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+
+  /vision/detections/{detectionId}:
+    get:
+      operationId: getDetectionById
+      summary: Lấy kết quả nhận diện theo ID
+      description: |
+        Camera Stream hoặc Core Business gọi để tra cứu lại kết quả nhận diện đã lưu.
+        Kết quả được lưu tối đa **24 giờ** sau khi tạo.
+      tags: [detection]
+      parameters:
+        - $ref: '#/components/parameters/DetectionId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Chi tiết kết quả nhận diện
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detection'
+              examples:
+                found:
+                  summary: Tìm thấy detection
+                  value:
+                    detectionId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    cameraId: CAM-0001
+                    correlationId: 550e8400-e29b-41d4-a716-446655440000
+                    riskLevel: high
+                    modelVersion: v2.3.1
+                    processingTimeMs: 320
+                    timestamp: '2026-05-12T08:00:00Z'
+                    objects:
+                      - label: person
+                        confidence: 0.94
+                        trackingId: TRK-0001
+                        boundingBox:
+                          x: 120
+                          y: 80
+                          width: 200
+                          height: 400
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /vision/models/info:
+    get:
+      operationId: getModelInfo
+      summary: Lấy thông tin model AI đang hoạt động
+      description: |
+        Camera Stream gọi khi khởi động hoặc kiểm tra định kỳ để biết phiên bản model,
+        danh sách nhãn hỗ trợ và độ chính xác tham chiếu.
+      tags: [model]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Thông tin model AI hiện tại
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelInfo'
+              examples:
+                current:
+                  summary: Model đang hoạt động
+                  value:
+                    modelId: yolo-campus-v2
+                    modelVersion: v2.3.1
+                    accuracy: 0.91
+                    supportedLabels:
+                      - person
+                      - vehicle
+                      - backpack
+                      - weapon
+                    lastUpdated: '2026-04-30T00:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+webhooks:
+  detectionHighRisk:
+    post:
+      operationId: onHighRiskDetection
+      summary: Webhook khi phát hiện rủi ro cao
+      description: |
+        AI Vision phát webhook tới Core Business khi `riskLevel` là `high`.
+        Consumer (Core Business) cần đăng ký endpoint nhận webhook này.
+      tags: [detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Detection'
+      responses:
+        '200':
+          description: Core Business đã nhận webhook
 
 components:
   securitySchemes:
@@ -503,574 +266,482 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: >
-        Cơ chế xác thực service-to-service bằng JWT Bearer Token.
-        Các service gọi AI Vision cần gửi header:
-        Authorization: Bearer <token>
+
+  parameters:
+    DetectionId:
+      name: detectionId
+      in: path
+      required: true
+      description: UUID của kết quả nhận diện.
+      schema:
+        type: string
+        format: uuid
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: UUID v4 do Camera Stream sinh ra để trace log end-to-end.
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
 
   schemas:
-    FrameDetectionRequest:
+
+    # ──────────────────────────────────────────────
+    # Health
+    # ──────────────────────────────────────────────
+    HealthStatus:
       type: object
       additionalProperties: false
-      description: Dữ liệu Camera Stream gửi sang AI Vision để phân tích một frame.
-      required:
-        - requestId
-        - cameraId
-        - frameUrl
-        - capturedAt
-        - analysisTypes
+      required: [status, service, version, timestamp]
       properties:
-        requestId:
+        status:
           type: string
-          description: Mã request duy nhất do Camera Stream tạo ra để trace/log.
-          example: "req-001"
-        cameraId:
+          enum: [healthy, degraded]
+          description: Trạng thái tổng thể của service.
+          example: healthy
+        service:
           type: string
-          description: Mã định danh camera gửi frame.
-          example: "CAM-A101-01"
-        roomId:
+          minLength: 2
+          maxLength: 80
+          description: Tên service.
+          example: ai-vision
+        version:
           type: string
-          description: Mã phòng học hoặc khu vực đặt camera.
-          example: "A101"
-        frameUrl:
-          type: string
-          format: uri
-          description: URL ảnh/frame cần AI phân tích.
-          example: "https://storage.smart-campus.local/frames/cam-a101-01.jpg"
-        capturedAt:
+          minLength: 1
+          maxLength: 20
+          description: Phiên bản đang chạy.
+          example: 1.0.0
+        uptime:
+          type: integer
+          minimum: 0
+          description: Số giây service đã chạy liên tục.
+          example: 86400
+        timestamp:
           type: string
           format: date-time
-          description: Thời điểm camera chụp frame.
-          example: "2026-05-20T08:00:00Z"
-        analysisTypes:
-          type: array
-          minItems: 1
-          description: Danh sách loại phân tích AI cần thực hiện.
-          items:
-            $ref: '#/components/schemas/AnalysisType'
-        metadata:
-          type: object
-          additionalProperties: true
-          description: Dữ liệu bổ sung từ Camera Stream, ví dụ motionEventId hoặc source.
+          description: Thời điểm kiểm tra.
+          example: '2026-05-12T08:00:00Z'
 
-    DetectionAcceptedResponse:
+    # ──────────────────────────────────────────────
+    # DetectRequest — oneOf + discriminator (inputType)
+    # ──────────────────────────────────────────────
+    DetectRequest:
+      oneOf:
+        - $ref: '#/components/schemas/DetectRequestByUrl'
+        - $ref: '#/components/schemas/DetectRequestByBase64'
+      discriminator:
+        propertyName: inputType
+        mapping:
+          URL: '#/components/schemas/DetectRequestByUrl'
+          BASE64: '#/components/schemas/DetectRequestByBase64'
+
+    DetectRequestBase:
+      type: object
+      required: [cameraId, inputType]
+      properties:
+        cameraId:
+          type: string
+          pattern: '^CAM-[0-9]{4}$'
+          description: Mã camera theo định dạng CAM-XXXX.
+          example: CAM-0001
+        inputType:
+          type: string
+          enum: [URL, BASE64]
+          description: Cách gửi ảnh — URL hoặc base64.
+          example: URL
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+          description: UUID trace log. Nếu thiếu, AI Vision tự sinh.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        timestamp:
+          type: [string, 'null']
+          format: date-time
+          description: Thời điểm camera capture frame.
+          example: '2026-05-12T08:00:00Z'
+
+    DetectRequestByUrl:
+      allOf:
+        - $ref: '#/components/schemas/DetectRequestBase'
+        - type: object
+          additionalProperties: false
+          required: [cameraId, inputType, imageUrl]
+          properties:
+            cameraId:
+              type: string
+              pattern: '^CAM-[0-9]{4}$'
+            inputType:
+              type: string
+              const: URL
+            correlationId:
+              type: [string, 'null']
+              format: uuid
+            timestamp:
+              type: [string, 'null']
+              format: date-time
+            imageUrl:
+              type: string
+              format: uri
+              maxLength: 2048
+              description: URL trỏ tới file ảnh JPEG/PNG. Kích thước tối đa 5 MB.
+              example: https://storage.campus.local/frames/cam0001-20260512-080000.jpg
+
+    DetectRequestByBase64:
+      allOf:
+        - $ref: '#/components/schemas/DetectRequestBase'
+        - type: object
+          additionalProperties: false
+          required: [cameraId, inputType, imageBase64]
+          properties:
+            cameraId:
+              type: string
+              pattern: '^CAM-[0-9]{4}$'
+            inputType:
+              type: string
+              const: BASE64
+            correlationId:
+              type: [string, 'null']
+              format: uuid
+            timestamp:
+              type: [string, 'null']
+              format: date-time
+            imageBase64:
+              type: string
+              maxLength: 7340032
+              description: |
+                Chuỗi base64 của ảnh JPEG/PNG. Kích thước gốc tối đa 5 MB
+                (base64 tương đương ~6.8 MB).
+              example: /9j/4AAQSkZJRgABAQAAAQABAAD...
+
+    # ──────────────────────────────────────────────
+    # Detection result
+    # ──────────────────────────────────────────────
+    Detection:
       type: object
       additionalProperties: false
-      description: Response trả về khi AI Vision đã nhận yêu cầu phân tích frame.
-      required:
-        - detectionId
-        - requestId
-        - status
+      required: [detectionId, cameraId, riskLevel, objects, timestamp]
       properties:
         detectionId:
           type: string
           format: uuid
-          description: Mã định danh của lần phân tích frame.
-          example: "550e8400-e29b-41d4-a716-446655440000"
-        requestId:
-          type: string
-          description: Mã request ban đầu do consumer gửi lên.
-          example: "req-001"
-        status:
-          $ref: '#/components/schemas/ProcessingStatus'
-        message:
-          type: string
-          description: Thông báo mô tả trạng thái tiếp nhận request.
-          example: "Yêu cầu phân tích frame đã được tiếp nhận"
-
-    FrameDetectionResponse:
-      type: object
-      additionalProperties: false
-      description: Kết quả phân tích frame từ AI Vision.
-      required:
-        - detectionId
-        - requestId
-        - cameraId
-        - status
-        - detections
-      properties:
-        detectionId:
-          type: string
-          format: uuid
-          description: Mã định danh của lần phân tích frame.
-        requestId:
-          type: string
-          description: Mã request ban đầu.
+          description: UUID định danh kết quả nhận diện.
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         cameraId:
           type: string
-          description: Mã camera gửi frame.
-        roomId:
-          type: string
-          description: Mã phòng học hoặc khu vực.
-        status:
-          $ref: '#/components/schemas/ProcessingStatus'
-        processedAt:
-          type: string
-          format: date-time
-          description: Thời điểm AI xử lý xong.
-        detections:
+          pattern: '^CAM-[0-9]{4}$'
+          description: Mã camera nguồn.
+          example: CAM-0001
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+          description: UUID trace log, khớp với request gốc.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        riskLevel:
+          $ref: '#/components/schemas/RiskLevel'
+        objects:
           type: array
-          description: Danh sách đối tượng/hành vi AI phát hiện được.
+          minItems: 0
+          maxItems: 50
+          description: Danh sách đối tượng được phát hiện trong frame.
           items:
             $ref: '#/components/schemas/DetectedObject'
-        summary:
-          $ref: '#/components/schemas/DetectionSummary'
-        error:
-          $ref: '#/components/schemas/ErrorDetail'
-
-    AnalysisJobRequest:
-      type: object
-      additionalProperties: false
-      description: Dữ liệu Core Business gửi sang AI Vision để tạo job phân tích.
-      required:
-        - requestId
-        - sourceService
-        - mediaType
-        - mediaUrl
-        - requestedAt
-        - analysisTypes
-      properties:
-        requestId:
-          type: string
-          description: Mã request do Core Business tạo.
-          example: "core-req-001"
-        sourceService:
-          type: string
-          description: Service gọi AI Vision.
-          example: "core-business"
-        sourceId:
-          type: string
-          description: Mã nghiệp vụ liên quan trong Core, ví dụ incidentId hoặc eventId.
-          example: "incident-001"
-        mediaType:
-          $ref: '#/components/schemas/MediaType'
-        mediaUrl:
-          type: string
-          format: uri
-          description: URL ảnh/video/frame cần phân tích.
-          example: "https://storage.smart-campus.local/incidents/frame-001.jpg"
-        roomId:
-          type: string
-          description: Mã phòng học hoặc khu vực.
-          example: "A203"
-        cameraId:
-          type: string
-          description: Mã camera liên quan.
-          example: "CAM-A203-02"
-        requestedAt:
+        modelVersion:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 20
+          description: Phiên bản model đã xử lý frame này.
+          example: v2.3.1
+        processingTimeMs:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 10000
+          description: Thời gian xử lý (mili giây).
+          example: 320
+        timestamp:
           type: string
           format: date-time
-          description: Thời điểm Core tạo yêu cầu phân tích.
-          example: "2026-05-20T09:15:00Z"
-        analysisTypes:
-          type: array
-          minItems: 1
-          description: Danh sách loại phân tích AI cần thực hiện.
-          items:
-            $ref: '#/components/schemas/AnalysisType'
-
-    AnalysisJobAcceptedResponse:
-      type: object
-      additionalProperties: false
-      description: Response trả về khi AI Vision đã nhận analysis job.
-      required:
-        - jobId
-        - requestId
-        - status
-      properties:
-        jobId:
-          type: string
-          format: uuid
-          description: Mã định danh của analysis job.
-        requestId:
-          type: string
-          description: Mã request ban đầu từ Core Business.
-        status:
-          $ref: '#/components/schemas/ProcessingStatus'
-        message:
-          type: string
-          description: Thông báo trạng thái tiếp nhận job.
-          example: "Yêu cầu phân tích đã được tiếp nhận"
-
-    AnalysisJobResponse:
-      type: object
-      additionalProperties: false
-      description: Kết quả xử lý analysis job.
-      required:
-        - jobId
-        - requestId
-        - status
-        - mediaType
-        - mediaUrl
-        - detections
-      properties:
-        jobId:
-          type: string
-          format: uuid
-          description: Mã định danh của analysis job.
-        requestId:
-          type: string
-          description: Mã request ban đầu.
-        status:
-          $ref: '#/components/schemas/ProcessingStatus'
-        mediaType:
-          $ref: '#/components/schemas/MediaType'
-        mediaUrl:
-          type: string
-          format: uri
-          description: URL ảnh/video/frame đã được phân tích.
-        processedAt:
-          type: string
-          format: date-time
-          description: Thời điểm AI xử lý xong.
-        detections:
-          type: array
-          description: Danh sách đối tượng/hành vi AI phát hiện được.
-          items:
-            $ref: '#/components/schemas/DetectedObject'
-        summary:
-          $ref: '#/components/schemas/DetectionSummary'
-        error:
-          $ref: '#/components/schemas/ErrorDetail'
+          description: Thời điểm AI Vision hoàn thành nhận diện.
+          example: '2026-05-12T08:00:00Z'
 
     DetectedObject:
       type: object
       additionalProperties: false
-      description: Một đối tượng hoặc hành vi được AI phát hiện trong ảnh/video.
-      required:
-        - objectId
-        - label
-        - confidence
-        - riskLevel
+      required: [label, confidence, boundingBox]
       properties:
-        objectId:
-          type: string
-          description: Mã định danh của object trong kết quả AI.
-          example: "obj-001"
-        classId:
-          type: string
-          description: Mã lớp phân loại của object/hành vi.
-          example: "student_sleeping"
         label:
           type: string
-          description: Nhãn phát hiện được, ví dụ person, student_sleeping, fighting.
-          example: "student_sleeping"
+          enum: [person, vehicle, backpack, weapon, unknown]
+          description: Nhãn nhận diện.
+          example: person
         confidence:
           type: number
-          format: float
           minimum: 0
           maximum: 1
-          description: Độ tin cậy của AI, giá trị từ 0 đến 1.
-          example: 0.91
-        riskLevel:
-          $ref: '#/components/schemas/RiskLevel'
+          description: Độ tin cậy nhận diện, trong khoảng [0, 1].
+          example: 0.94
         trackingId:
-          type: string
-          description: Mã tracking nếu AI theo dõi cùng một object qua nhiều frame.
-          example: "track-001"
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 20
+          description: ID theo dõi đối tượng qua nhiều frame (null nếu chưa theo dõi).
+          example: TRK-0001
         boundingBox:
           $ref: '#/components/schemas/BoundingBox'
-        attributes:
-          type: object
-          additionalProperties: true
-          description: Thuộc tính bổ sung của object/hành vi.
-          example:
-            posture: "head_down"
-            durationSeconds: 30
 
     BoundingBox:
       type: object
       additionalProperties: false
-      description: Tọa độ vùng chứa object trong ảnh.
-      required:
-        - x
-        - y
-        - width
-        - height
+      required: [x, y, width, height]
+      description: Vị trí hình chữ nhật bao quanh đối tượng (pixel).
       properties:
         x:
           type: integer
           minimum: 0
-          description: Tọa độ x của góc trái trên bounding box.
+          description: Tọa độ x góc trên trái.
           example: 120
         y:
           type: integer
           minimum: 0
-          description: Tọa độ y của góc trái trên bounding box.
+          description: Tọa độ y góc trên trái.
           example: 80
         width:
           type: integer
           minimum: 1
           description: Chiều rộng bounding box.
-          example: 220
+          example: 200
         height:
           type: integer
           minimum: 1
           description: Chiều cao bounding box.
-          example: 300
-
-    DetectionSummary:
-      type: object
-      additionalProperties: false
-      description: Thông tin tổng hợp ngắn gọn của kết quả AI.
-      properties:
-        totalObjects:
-          type: integer
-          minimum: 0
-          description: Tổng số object/hành vi phát hiện được.
-          example: 1
-        highestRiskLevel:
-          $ref: '#/components/schemas/RiskLevel'
-        eventType:
-          $ref: '#/components/schemas/AnalysisType'
-
-    ModelInfo:
-      type: object
-      additionalProperties: false
-      description: Thông tin model AI đang được AI Vision sử dụng.
-      required:
-        - modelName
-        - version
-        - status
-        - supportedAnalysisTypes
-      properties:
-        modelName:
-          type: string
-          description: Tên model AI.
-          example: "SmartCampus-YOLO-Behavior"
-        version:
-          type: string
-          description: Phiên bản model AI.
-          example: "1.0.0"
-        status:
-          type: string
-          description: Trạng thái hiện tại của model.
-          enum:
-            - READY
-            - LOADING
-            - UNAVAILABLE
-          example: "READY"
-        framework:
-          type: string
-          description: Framework dùng để triển khai model.
-          example: "PyTorch"
-        supportedAnalysisTypes:
-          type: array
-          description: Danh sách loại phân tích mà model hỗ trợ.
-          items:
-            $ref: '#/components/schemas/AnalysisType'
-        updatedAt:
-          type: string
-          format: date-time
-          description: Thời điểm cập nhật model gần nhất.
-          example: "2026-05-20T00:00:00Z"
-        description:
-          type: string
-          description: Mô tả ngắn về model.
-          example: "Model AI dùng để giám sát lớp học thông minh."
-
-    HealthResponse:
-      type: object
-      additionalProperties: false
-      description: Kết quả kiểm tra trạng thái service AI Vision.
-      required:
-        - status
-        - timestamp
-      properties:
-        status:
-          type: string
-          description: Trạng thái service AI Vision.
-          enum:
-            - UP
-            - DOWN
-          example: "UP"
-        modelStatus:
-          type: string
-          description: Trạng thái model AI.
-          enum:
-            - READY
-            - LOADING
-            - UNAVAILABLE
-          example: "READY"
-        timestamp:
-          type: string
-          format: date-time
-          description: Thời điểm kiểm tra health.
-          example: "2026-05-20T08:00:00Z"
-
-    AnalysisType:
-      type: string
-      description: >
-        Loại phân tích AI cần thực hiện.
-        Các loại này được thiết kế cho môi trường giáo dục thông minh.
-      enum:
-        - PERSON_DETECTION
-        - ATTENDANCE_RECOGNITION
-        - SLEEPING_DETECTION
-        - FIGHTING_DETECTION
-        - FALL_DETECTION
-        - CROWD_DETECTION
-        - PHONE_USAGE_DETECTION
-        - INTRUSION_DETECTION
-
-    MediaType:
-      type: string
-      description: Loại media được gửi sang AI Vision.
-      enum:
-        - IMAGE
-        - VIDEO
-        - FRAME
-
-    ProcessingStatus:
-      type: string
-      description: Trạng thái xử lý của AI Vision.
-      enum:
-        - PROCESSING
-        - COMPLETED
-        - FAILED
+          example: 400
 
     RiskLevel:
       type: string
-      description: Mức độ rủi ro hoặc nghiêm trọng của kết quả phát hiện.
-      enum:
-        - LOW
-        - MEDIUM
-        - HIGH
-        - CRITICAL
+      enum: [low, medium, high]
+      description: |
+        Mức rủi ro tổng hợp của frame:
+        - `low` — không có bất thường
+        - `medium` — có đối tượng cần theo dõi
+        - `high` — phát hiện nguy hiểm, cần cảnh báo ngay
+      example: high
 
-    ErrorDetail:
+    # ──────────────────────────────────────────────
+    # Model info
+    # ──────────────────────────────────────────────
+    ModelInfo:
       type: object
       additionalProperties: false
-      description: Thông tin lỗi chi tiết khi AI xử lý thất bại.
+      required: [modelId, modelVersion, supportedLabels]
       properties:
-        code:
+        modelId:
           type: string
-          description: Mã lỗi nội bộ.
-          example: "MODEL_TIMEOUT"
-        message:
+          minLength: 2
+          maxLength: 80
+          description: Định danh model AI.
+          example: yolo-campus-v2
+        modelVersion:
           type: string
-          description: Mô tả lỗi.
-          example: "AI model processing timeout"
+          minLength: 1
+          maxLength: 20
+          description: Phiên bản model.
+          example: v2.3.1
+        accuracy:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+          description: Độ chính xác tham chiếu trên tập test [0, 1].
+          example: 0.91
+        supportedLabels:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+          description: Danh sách nhãn model có thể nhận diện.
+          example: [person, vehicle, backpack, weapon]
+        lastUpdated:
+          type: [string, 'null']
+          format: date-time
+          description: Thời điểm model được cập nhật lần cuối.
+          example: '2026-04-30T00:00:00Z'
 
-    ErrorResponse:
+    # ──────────────────────────────────────────────
+    # Problem Details (RFC 7807)
+    # ──────────────────────────────────────────────
+    Problem:
       type: object
       additionalProperties: false
-      description: Response lỗi chuẩn theo định dạng application/problem+json.
-      required:
-        - title
-        - status
-        - detail
+      required: [type, title, status]
       properties:
         type:
           type: string
-          description: URI mô tả loại lỗi.
-          example: "https://api.smart-campus.local/errors/bad-request"
+          format: uri
+          description: URI định danh loại lỗi.
+          example: https://campus.local/errors/validation
         title:
           type: string
+          minLength: 3
+          maxLength: 120
           description: Tiêu đề lỗi ngắn gọn.
-          example: "Bad Request"
+          example: Dữ liệu không hợp lệ
         status:
           type: integer
+          minimum: 400
+          maximum: 599
           description: HTTP status code.
           example: 400
         detail:
-          type: string
+          type: [string, 'null']
+          maxLength: 500
           description: Mô tả chi tiết lỗi.
-          example: "Invalid request payload"
+          example: Field imageUrl không phải URI hợp lệ
         instance:
-          type: string
-          description: Endpoint hoặc resource gây lỗi.
-          example: "/api/v1/vision/frame-detections"
-        traceId:
-          type: string
-          description: Mã trace để debug/log.
-          example: "trace-001"
+          type: [string, 'null']
+          format: uri
+          description: URI của request gây lỗi.
+          example: https://ai-vision.campus.local/vision/detect
+        errors:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [field, code, message]
+            properties:
+              field:
+                type: string
+                minLength: 1
+                maxLength: 80
+                example: cameraId
+              code:
+                type: string
+                minLength: 2
+                maxLength: 80
+                example: PATTERN_MISMATCH
+              message:
+                type: string
+                minLength: 3
+                maxLength: 200
+                example: cameraId phải có dạng CAM-XXXX (4 chữ số)
 
   responses:
     BadRequest:
-      description: Request không hợp lệ, sai định dạng hoặc thiếu trường bắt buộc.
+      description: Payload sai định dạng hoặc vi phạm schema
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Bad Request"
+            type: https://campus.local/errors/validation
+            title: Dữ liệu không hợp lệ
             status: 400
-            detail: "Request không hợp lệ hoặc thiếu dữ liệu bắt buộc"
+            detail: Field cameraId không đúng pattern
+            instance: https://ai-vision.campus.local/vision/detect
+            errors:
+              - field: cameraId
+                code: PATTERN_MISMATCH
+                message: cameraId phải có dạng CAM-XXXX (4 chữ số)
 
     Unauthorized:
-      description: Thiếu token hoặc token xác thực không hợp lệ.
+      description: Thiếu hoặc sai Bearer token JWT
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Unauthorized"
+            type: https://campus.local/errors/unauthorized
+            title: Chưa xác thực
             status: 401
-            detail: "Thiếu hoặc sai Bearer token"
+            detail: Thiếu hoặc hết hạn Bearer token
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []
 
     Forbidden:
-      description: Service gọi API không có quyền truy cập tài nguyên này.
+      description: Token hợp lệ nhưng không có quyền thực hiện thao tác
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Forbidden"
+            type: https://campus.local/errors/forbidden
+            title: Không có quyền truy cập
             status: 403
-            detail: "Không có quyền truy cập API này"
+            detail: Camera service không có quyền gọi endpoint này
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []
 
     NotFound:
-      description: Không tìm thấy resource theo ID đã cung cấp.
+      description: Resource không tồn tại
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Not Found"
+            type: https://campus.local/errors/not-found
+            title: Không tìm thấy
             status: 404
-            detail: "Không tìm thấy kết quả phân tích"
+            detail: Detection ID không tồn tại hoặc đã hết TTL 24h
+            instance: https://ai-vision.campus.local/vision/detections/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+            errors: []
+
+    PayloadTooLarge:
+      description: Frame ảnh vượt quá giới hạn 5 MB
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/payload-too-large
+            title: Payload quá lớn
+            status: 413
+            detail: Kích thước ảnh vượt quá 5 MB. Vui lòng resize trước khi gửi.
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []
 
     UnprocessableEntity:
-      description: Request đúng cú pháp JSON nhưng dữ liệu không hợp lệ về nghiệp vụ.
+      description: Ảnh đúng format nhưng không thể nhận diện (quá tối, mờ, không có content)
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Unprocessable Entity"
+            type: https://campus.local/errors/unprocessable
+            title: Không thể xử lý ảnh
             status: 422
-            detail: "Loại phân tích không được hỗ trợ cho media này"
-
-    TooManyRequests:
-      description: Service gọi API quá nhiều lần trong một khoảng thời gian ngắn.
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            title: "Too Many Requests"
-            status: 429
-            detail: "Vượt quá giới hạn request cho phép"
-
-    InternalServerError:
-      description: Lỗi không mong muốn bên trong AI Vision Service.
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            title: "Internal Server Error"
-            status: 500
-            detail: "Lỗi hệ thống AI Vision"
+            detail: Chất lượng ảnh quá thấp để nhận diện (quá tối hoặc mờ)
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []
 
     ServiceUnavailable:
-      description: AI Vision Service hoặc model AI hiện không khả dụng.
+      description: AI Vision Service đang khởi động lại hoặc quá tải
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/Problem'
           example:
-            title: "Service Unavailable"
+            type: https://campus.local/errors/service-unavailable
+            title: Dịch vụ tạm thời không sẵn sàng
             status: 503
-            detail: "Model AI hiện không khả dụng hoặc đang tải lại"
+            detail: Model đang tải lại. Vui lòng thử lại sau 5 giây.
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []
+
+    InternalServerError:
+      description: Lỗi không mong muốn phía server
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/internal
+            title: Lỗi máy chủ nội bộ
+            status: 500
+            detail: Lỗi không xác định trong quá trình xử lý
+            instance: https://ai-vision.campus.local/vision/detect
+            errors: []

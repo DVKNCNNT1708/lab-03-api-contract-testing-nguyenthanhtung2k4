@@ -30,7 +30,7 @@ jobs:
           nohup npm run mock:vision > prism-vision.log 2>&1 &
 
       - name: Wait for mock server
-        run: npx wait-on http://localhost:4011/api/v1/vision/health --timeout 30000
+        run: npx wait-on tcp:4011 --timeout 60000
 
       - name: Run Newman contract tests
         run: npm run test:mock
